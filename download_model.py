@@ -5,6 +5,8 @@ Download RCAN_BIX3.pt model from Google Drive
 
 import os
 import sys
+import glob
+import shutil
 import requests
 from pathlib import Path
 import zipfile
@@ -65,12 +67,28 @@ def download_and_extract_models(output_dir='models'):
         
         # Extract zip file
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(output_dir)
+            # Extract to temporary location first
+            temp_extract_dir = os.path.join(output_dir, 'temp_extract')
+            zip_ref.extractall(temp_extract_dir)
+        
+        # Find all .pt files (they might be in subdirectories)
+        extracted_models = glob.glob(os.path.join(temp_extract_dir, '**', '*.pt'), recursive=True)
+        
+        if not extracted_models:
+            print("⚠️  No .pt files found in extraction")
+        
+        # Move .pt files from subdirectory to output_dir
+        for model_path in extracted_models:
+            model_name = os.path.basename(model_path)
+            dest_path = os.path.join(output_dir, model_name)
+            shutil.move(model_path, dest_path)
+            print(f"  Moved: {model_name}")
+        
+        # Clean up temp directory and zip
+        shutil.rmtree(temp_extract_dir)
+        os.remove(zip_path)
         
         print(f"✓ Extraction complete!")
-        
-        # Clean up zip file
-        os.remove(zip_path)
         
         # List extracted models
         model_files = [f for f in os.listdir(output_dir) if f.endswith('.pt')]

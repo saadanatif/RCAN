@@ -61,14 +61,25 @@ jobs:
           echo "Downloading RCAN models..."
           python download_model.py --output_dir models
           
+          # Check if models were extracted to subdirectory
+          if [ -d "models/models_ECCV2018RCAN" ]; then
+            echo "Moving models from subdirectory..."
+            mv models/models_ECCV2018RCAN/*.pt models/ || true
+            rmdir models/models_ECCV2018RCAN || true
+          fi
+          
           # Verify the model exists
           if [ ! -f "models/RCAN_BIX${SCALE}.pt" ]; then
             echo "Error: RCAN_BIX${SCALE}.pt not found!"
+            echo "Contents of models directory:"
             ls -la models/
+            echo "Looking for .pt files recursively:"
+            find models/ -name "*.pt" -type f
             exit 1
           fi
           
           echo "✓ Model downloaded successfully"
+          ls -lh models/*.pt
       
       - name: Convert to CoreML
         env:

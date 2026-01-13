@@ -5,6 +5,9 @@ import UIKit
 import CoreML
 import CoreImage
 
+// Note: The RCAN CoreML model outputs a tensor (MLMultiArray) instead of an image
+// This is because the output is in [0, 255] range and CoreML ImageType requires normalized values
+
 class RCANSuperResolution {
     
     // MARK: - Properties
@@ -60,8 +63,10 @@ class RCANSuperResolution {
             let input = RCAN_BIX3Input(input_image: pixelBuffer)
             let output = try model.prediction(input: input)
             
-            // Step 4: Convert output to UIImage
-            return UIImage(pixelBuffer: output.output_image)
+            // Step 4: Convert output tensor to UIImage
+            // Output is a MLMultiArray with shape [1, 3, 540, 540]
+            // Values are in range [0, 255]
+            return UIImage(fromMultiArray: output.output_image, width: 540, height: 540)
             
         } catch {
             print("❌ Prediction failed: \(error)")
@@ -147,6 +152,62 @@ extension UIImage {
         let context = CIContext()
         
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else {
+            return nil
+        }
+        
+        self.init(cgImage: cgImage)
+    }
+    
+    /// Create UIImage from MLMultiArray (CoreML output tensor)
+    /// - Parameters:
+    ///   - multiArray: MLMultiArray with shape [1, 3, height, width] or [3, height, width]
+    ///   - width: Output image width
+    ///   - height: Output image height
+    /// - Returns: UIImage or nil if conversion fails
+    convenience init?(fromMultiArray multiArray: MLMultiArray, width: Int, height: Int) {
+        // Assuming multiArray shape is [1, 3, H, W] or [3, H, W]
+        // Values are in range [0, 255]
+        
+        let channels = 3
+        let bytesPerRow = width * 4 // RGBA
+        
+        guard let data = UnsafeMutablePointer<UInt8>.allocate(capacity: width * height * 4) as UnsafeMutablePointer<UInt8>? else {
+            return nil
+        }
+        
+        // Convert MLMultiArray to RGBA bytes
+        for y in 0..<height {
+            for x in 0..<width {
+                let r = multiArray[[0, 0, y, x] as [NSNumber]].floatValue
+                let g = multiArray[[0, 1, y, x] as [NSNumber]].floatValue
+                let b = multiArray[[0, 2, y, x] as [NSNumber]].floatValue
+                
+                let offset = (y * width + x) * 4
+                data[offset + 0] = UInt8(max(0, min(255, r)))     // R
+                data[offset + 1] = UInt8(max(0, min(255, g)))     // G
+                data[offset + 2] = UInt8(max(0, min(255, b)))     // B
+                data[offset + 3] = 255                             // A
+            }
+        }
+        
+        // Create CGImage from raw data
+        guard let provider = CGDataProvider(dataInfo: nil,
+                                           data: data,
+                                           size: width * height * 4,
+                                           releaseData: { info, data, size in
+                                               data.deallocate()
+                                           }),
+              let cgImage = CGImage(width: width,
+                                   height: height,
+                                   bitsPerComponent: 8,
+                                   bitsPerPixel: 32,
+                                   bytesPerRow: bytesPerRow,
+                                   space: CGColorSpaceCreateDeviceRGB(),
+                                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                   provider: provider,
+                                   decode: nil,
+                                   shouldInterpolate: false,
+                                   intent: .defaultIntent) else {
             return nil
         }
         

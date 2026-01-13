@@ -105,10 +105,8 @@ def convert_to_coreml(model, output_path, input_shape=(1, 3, 180, 180)):
             bias=[0, 0, 0],
             color_layout=ct.colorlayout.RGB
         )],
-        outputs=[ct.ImageType(
-            name="output_image",
-            scale=1.0/255.0,
-            bias=[0, 0, 0]
+        outputs=[ct.TensorType(
+            name="output_image"
         )],
         compute_units=ct.ComputeUnit.ALL,
         minimum_deployment_target=ct.target.iOS15

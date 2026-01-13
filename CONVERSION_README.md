@@ -111,16 +111,17 @@ print(model.get_spec())
 ### Input/Output Format
 
 **Input**:
-- **Type**: RGB Image
+- **Type**: RGB Image (ImageType)
 - **Shape**: (1, 3, H, W) where H and W are divisible by scale
-- **Range**: [0, 255] (automatically normalized)
+- **Range**: [0, 255] (automatically normalized to [0, 1] by CoreML)
 - **Color Layout**: RGB
 
 **Output**:
-- **Type**: RGB Image
+- **Type**: Tensor (MLMultiArray / TensorType)
 - **Shape**: (1, 3, H×scale, W×scale)
 - **Range**: [0, 255]
-- **Color Layout**: RGB
+- **Data Type**: Float32
+- **Note**: Output is a tensor, not an image. Use provided Swift helper to convert to UIImage.
 
 ## 🔧 Advanced Usage
 
@@ -184,8 +185,9 @@ func superResolve(image: UIImage) throws -> UIImage? {
     let input = RCAN_BIX3Input(input_image: pixelBuffer)
     let output = try model.prediction(input: input)
     
-    // Convert output to UIImage
-    return UIImage(pixelBuffer: output.output_image)
+    // Convert output tensor to UIImage
+    // Output is MLMultiArray [1, 3, 540, 540], values in [0, 255]
+    return UIImage(fromMultiArray: output.output_image, width: 540, height: 540)
 }
 ```
 

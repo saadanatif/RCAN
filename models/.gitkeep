@@ -1,0 +1,13 @@
+# This folder will contain downloaded PyTorch models and converted CoreML models
+# Models are not committed to git due to their large size
+
+## Expected files after running download_model.py:
+# - RCAN_BIX2.pt
+# - RCAN_BIX3.pt
+# - RCAN_BIX4.pt
+# - RCAN_BIX8.pt
+# - RCAN_BDX3.pt
+
+## Expected files after running convert_to_coreml.py:
+# - RCAN_BIX3.mlmodel
+# - RCAN_BIX3_quantized.mlmodel (if --quantize flag used)

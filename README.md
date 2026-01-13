@@ -11,11 +11,12 @@ For BI degradation model, scales=2,3,4,8: [Results_ECCV2018RCAN_BIX2X3X4X8](http
 
 ## Contents
 1. [Introduction](#introduction)
-2. [Train](#train)
-3. [Test](#test)
-4. [Results](#results)
-5. [Citation](#citation)
-6. [Acknowledgements](#acknowledgements)
+2. [CoreML Conversion](#coreml-conversion) 🆕
+3. [Train](#train)
+4. [Test](#test)
+5. [Results](#results)
+6. [Citation](#citation)
+7. [Acknowledgements](#acknowledgements)
 
 ## Introduction
 Convolutional neural network (CNN) depth is of crucial importance for image super-resolution (SR). However, we observe that deeper networks for image SR are more difficult to train. The low-resolution inputs and features contain abundant low-frequency information, which is treated equally across channels, hence hindering the representational ability of CNNs. To solve these problems, we propose the very deep residual channel attention networks (RCAN). Specifically, we propose a residual in residual (RIR) structure to form very deep network, which consists of several residual groups with long skip connections. Each residual group contains some residual blocks with short skip connections. Meanwhile, RIR allows abundant low-frequency information to be bypassed through multiple skip connections, making the main network focus on learning high-frequency information. Furthermore, we propose a channel attention mechanism to adaptively rescale channel-wise features by considering interdependencies among channels. Extensive experiments show that our RCAN achieves better accuracy and visual improvements against state-of-the-art methods.
@@ -26,6 +27,49 @@ Channel attention (CA) architecture.
 Residual channel attention block (RCAB) architecture.
 ![RCAN](/Figs/RCAN.PNG)
 The architecture of our proposed residual channel attention network (RCAN).
+
+## CoreML Conversion
+
+**🆕 NEW: Convert RCAN models to CoreML for iOS/macOS deployment!**
+
+### Quick Start
+
+```bash
+# Install dependencies
+pip install -r requirements_coreml.txt
+
+# Download RCAN_BIX3 model
+python download_model.py
+
+# Convert to CoreML
+python convert_to_coreml.py --model_path models/RCAN_BIX3.pt --scale 3 --quantize
+```
+
+### GitHub Actions Workflow
+
+This repository includes an automated GitHub Actions workflow to convert RCAN models to CoreML format. Simply go to the **Actions** tab and run the **"Convert RCAN to CoreML"** workflow.
+
+**Features:**
+- ✅ Automatic model download from Google Drive
+- ✅ PyTorch to CoreML conversion
+- ✅ 16-bit quantization (50% size reduction)
+- ✅ Supports all scales (2x, 3x, 4x, 8x)
+- ✅ Optimized for Apple Neural Engine
+- ✅ Ready for iOS/macOS deployment
+
+### Documentation
+
+- **[Quick Start Guide](COREML_QUICKSTART.md)** - Get started in 3 steps
+- **[Full Documentation](CONVERSION_README.md)** - Complete guide with examples
+- **[GitHub Actions Workflow](.github/workflows/convert_to_coreml.yml)** - Automated conversion
+
+### Model Specifications
+
+| Model | Scale | Input | Output | Size (Full) | Size (Quantized) |
+|-------|-------|-------|--------|-------------|------------------|
+| RCAN_BIX3 | 3x | 180×180 | 540×540 | ~62 MB | ~31 MB |
+
+For more details, see [CONVERSION_README.md](CONVERSION_README.md).
 
 ## Train
 ### Prepare training data 

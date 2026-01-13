@@ -1,0 +1,24 @@
+# Requirements for RCAN to CoreML conversion
+# Updated dependencies compatible with modern Python and CoreML conversion
+
+# Core dependencies
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# CoreML conversion
+coremltools>=7.0
+
+# Model downloading
+gdown>=4.7.0
+requests>=2.31.0
+
+# Utilities
+tqdm>=4.65.0
+
+# Original RCAN dependencies (if needed for training)
+# matplotlib>=3.7.0
+# scikit-image>=0.21.0
+# scipy>=1.11.0
+# PyYAML>=6.0

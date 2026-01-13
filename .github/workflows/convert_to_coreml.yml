@@ -96,7 +96,7 @@ jobs:
           
           python convert_to_coreml.py \
             --model_path models/RCAN_BIX${SCALE}.pt \
-            --output models/RCAN_BIX${SCALE}.mlmodel \
+            --output models/RCAN_BIX${SCALE}.mlpackage \
             --scale ${SCALE} \
             --input_height ${INPUT_SIZE} \
             --input_width ${INPUT_SIZE} \
@@ -110,26 +110,60 @@ jobs:
           QUANTIZE: ${{ github.event.inputs.quantize || 'true' }}
         run: |
           echo "Verifying CoreML models..."
-          ls -lh models/*.mlmodel
+          ls -lh models/*.mlpackage || echo "No .mlpackage files found"
           
           # Print model info
           python -c "
           import coremltools as ct
           import os
           
-          model_path = 'models/RCAN_BIX${SCALE}.mlmodel'
+          def get_size(path):
+              if os.path.isdir(path):
+                  total = 0
+                  for dirpath, dirnames, filenames in os.walk(path):
+                      for f in filenames:
+                          total += os.path.getsize(os.path.join(dirpath, f))
+                  return total / (1024*1024)
+              return os.path.getsize(path) / (1024*1024)
+          
+          model_path = 'models/RCAN_BIX${SCALE}.mlpackage'
           if os.path.exists(model_path):
               model = ct.models.MLModel(model_path)
               print(f'\n✓ Full precision model loaded successfully')
-              print(f'  Size: {os.path.getsize(model_path) / (1024*1024):.2f} MB')
+              print(f'  Size: {get_size(model_path):.2f} MB')
           
           if '${QUANTIZE}' == 'true':
-              quantized_path = 'models/RCAN_BIX${SCALE}_quantized.mlmodel'
+              quantized_path = 'models/RCAN_BIX${SCALE}_quantized.mlpackage'
               if os.path.exists(quantized_path):
                   model = ct.models.MLModel(quantized_path)
                   print(f'\n✓ Quantized model loaded successfully')
-                  print(f'  Size: {os.path.getsize(quantized_path) / (1024*1024):.2f} MB')
+                  print(f'  Size: {get_size(quantized_path):.2f} MB')
           "
+      
+      - name: Prepare models for upload
+        env:
+          SCALE: ${{ github.event.inputs.scale || '3' }}
+          QUANTIZE: ${{ github.event.inputs.quantize || 'true' }}
+        run: |
+          echo "Zipping .mlpackage files for upload..."
+          
+          # Zip main model
+          if [ -d "models/RCAN_BIX${SCALE}.mlpackage" ]; then
+            cd models
+            zip -r RCAN_BIX${SCALE}.mlpackage.zip RCAN_BIX${SCALE}.mlpackage
+            cd ..
+            echo "✓ Zipped RCAN_BIX${SCALE}.mlpackage"
+          fi
+          
+          # Zip quantized model if exists
+          if [ "$QUANTIZE" = "true" ] && [ -d "models/RCAN_BIX${SCALE}_quantized.mlpackage" ]; then
+            cd models
+            zip -r RCAN_BIX${SCALE}_quantized.mlpackage.zip RCAN_BIX${SCALE}_quantized.mlpackage
+            cd ..
+            echo "✓ Zipped RCAN_BIX${SCALE}_quantized.mlpackage"
+          fi
+          
+          ls -lh models/*.zip
       
       - name: Create model info
         env:
@@ -142,6 +176,7 @@ jobs:
           Model: RCAN_BIX${SCALE}
           Scale: ${SCALE}x super-resolution
           Architecture: Residual Channel Attention Network
+          Format: ML Program (.mlpackage)
           
           Model Details:
           - Residual Groups: 10
@@ -156,10 +191,10 @@ jobs:
           Conversion Date: $(date)
           GitHub Actions Run: ${{ github.run_number }}
           
-          Files Generated:
+          Files Generated (download and unzip):
           EOF
           
-          ls -lh models/*.mlmodel | awk '{print "- " $9 " (" $5 ")"}' >> models/MODEL_INFO.txt
+          ls -lh models/*.zip | awk '{print "- " $9 " (" $5 ")"}' >> models/MODEL_INFO.txt
           
           cat models/MODEL_INFO.txt
       
@@ -168,7 +203,7 @@ jobs:
         with:
           name: rcan-coreml-models-scale${{ github.event.inputs.scale || '3' }}
           path: |
-            models/*.mlmodel
+            models/*.zip
             models/MODEL_INFO.txt
           retention-days: 90
       
@@ -177,7 +212,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            models/*.mlmodel
+            models/*.zip
             models/MODEL_INFO.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -190,12 +225,15 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Model Details" >> $GITHUB_STEP_SUMMARY
           echo "- **Scale:** ${SCALE}x" >> $GITHUB_STEP_SUMMARY
+          echo "- **Format:** ML Program (.mlpackage)" >> $GITHUB_STEP_SUMMARY
           echo "- **Input Size:** ${{ github.event.inputs.input_size || '180' }}x${{ github.event.inputs.input_size || '180' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Quantized:** ${{ github.event.inputs.quantize || 'true' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Generated Files" >> $GITHUB_STEP_SUMMARY
+          echo "### Generated Files (Zipped)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          ls -lh models/*.mlmodel >> $GITHUB_STEP_SUMMARY
+          ls -lh models/*.zip >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ CoreML models are available as artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "✅ CoreML models are available as artifacts (download and unzip)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** .mlpackage files are zipped for download. Unzip them to use in Xcode." >> $GITHUB_STEP_SUMMARY

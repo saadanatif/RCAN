@@ -67,12 +67,14 @@ This will download models from Google Drive:
 # Convert RCAN_BIX3 (3x scale) to CoreML
 python convert_to_coreml.py \
   --model_path models/RCAN_BIX3.pt \
-  --output models/RCAN_BIX3.mlmodel \
+  --output models/RCAN_BIX3.mlpackage \
   --scale 3 \
   --input_height 180 \
   --input_width 180 \
   --quantize
 ```
+
+**Note:** Output is `.mlpackage` (ML Program format, iOS 15+). This is a directory bundle, not a single file.
 
 **Parameters**:
 - `--model_path`: Path to PyTorch model (.pt file)
@@ -88,7 +90,7 @@ python convert_to_coreml.py \
 import coremltools as ct
 
 # Load and inspect the model
-model = ct.models.MLModel('models/RCAN_BIX3.mlmodel')
+model = ct.models.MLModel('models/RCAN_BIX3.mlpackage')
 print(model.get_spec())
 ```
 
@@ -99,6 +101,8 @@ print(model.get_spec())
 | Parameter | Value |
 |-----------|-------|
 | Scale Factor | 3x |
+| Format | ML Program (.mlpackage) |
+| iOS Version | iOS 15+ |
 | Input Size | 180x180 (configurable) |
 | Output Size | 540x540 |
 | Residual Groups | 10 |

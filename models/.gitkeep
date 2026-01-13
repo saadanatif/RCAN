@@ -9,5 +9,7 @@
 # - RCAN_BDX3.pt
 
 ## Expected files after running convert_to_coreml.py:
-# - RCAN_BIX3.mlmodel
-# - RCAN_BIX3_quantized.mlmodel (if --quantize flag used)
+# - RCAN_BIX3.mlpackage/ (directory)
+# - RCAN_BIX3_quantized.mlpackage/ (directory, if --quantize flag used)
+#
+# Note: .mlpackage is a directory bundle (ML Program format for iOS 15+)

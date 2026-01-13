@@ -38,11 +38,13 @@ env/
 models/*.pt
 models/*.pth
 models/*.mlmodel
+models/*.mlpackage/
 models/*.mlpackage
 models/*.zip
 *.pt
 *.pth
 *.mlmodel
+*.mlpackage/
 *.mlpackage
 
 # Keep model directory structure

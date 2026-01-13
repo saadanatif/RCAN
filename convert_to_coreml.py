@@ -118,14 +118,28 @@ def convert_to_coreml(model, output_path, input_shape=(1, 3, 180, 180)):
     mlmodel.short_description = 'RCAN (Residual Channel Attention Network) for 3x image super-resolution'
     mlmodel.version = '1.0'
     
+    # Ensure correct extension for ML Program
+    if output_path.endswith('.mlmodel'):
+        output_path = output_path.replace('.mlmodel', '.mlpackage')
+        print(f"  Note: Changed extension to .mlpackage (ML Program format)")
+    
     # Save the model
     print(f"  Saving CoreML model to {output_path}...")
     mlmodel.save(output_path)
     
     print(f"✓ CoreML model saved successfully!")
     
-    # Get model size
-    model_size = os.path.getsize(output_path) / (1024 * 1024)
+    # Get model size (mlpackage is a directory)
+    if os.path.isdir(output_path):
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(output_path):
+            for filename in filenames:
+                filepath = os.path.join(dirpath, filename)
+                total_size += os.path.getsize(filepath)
+        model_size = total_size / (1024 * 1024)
+    else:
+        model_size = os.path.getsize(output_path) / (1024 * 1024)
+    
     print(f"  Model size: {model_size:.2f} MB")
     
     return mlmodel
@@ -133,6 +147,10 @@ def convert_to_coreml(model, output_path, input_shape=(1, 3, 180, 180)):
 def quantize_model(model_path, output_path):
     """Quantize CoreML model to reduce size"""
     print(f"\nQuantizing model...")
+    
+    # Ensure correct extension
+    if output_path.endswith('.mlmodel'):
+        output_path = output_path.replace('.mlmodel', '.mlpackage')
     
     # Load model
     model = ct.models.MLModel(model_path)
@@ -143,20 +161,33 @@ def quantize_model(model_path, output_path):
     # Save quantized model
     quantized_model.save(output_path)
     
-    original_size = os.path.getsize(model_path) / (1024 * 1024)
-    quantized_size = os.path.getsize(output_path) / (1024 * 1024)
+    # Calculate sizes (handle directories)
+    def get_size(path):
+        if os.path.isdir(path):
+            total = 0
+            for dirpath, dirnames, filenames in os.walk(path):
+                for filename in filenames:
+                    filepath = os.path.join(dirpath, filename)
+                    total += os.path.getsize(filepath)
+            return total / (1024 * 1024)
+        return os.path.getsize(path) / (1024 * 1024)
+    
+    original_size = get_size(model_path)
+    quantized_size = get_size(output_path)
     
     print(f"✓ Quantized model saved!")
     print(f"  Original size: {original_size:.2f} MB")
     print(f"  Quantized size: {quantized_size:.2f} MB")
     print(f"  Reduction: {(1 - quantized_size/original_size)*100:.1f}%")
+    
+    return output_path
 
 def main():
     parser = argparse.ArgumentParser(description='Convert RCAN PyTorch model to CoreML')
     parser.add_argument('--model_path', type=str, default='models/RCAN_BIX3.pt',
                         help='Path to RCAN PyTorch model')
-    parser.add_argument('--output', type=str, default='models/RCAN_BIX3.mlmodel',
-                        help='Output path for CoreML model')
+    parser.add_argument('--output', type=str, default='models/RCAN_BIX3.mlpackage',
+                        help='Output path for CoreML model (.mlpackage for ML Program format)')
     parser.add_argument('--scale', type=int, default=3,
                         help='Super-resolution scale factor')
     parser.add_argument('--input_height', type=int, default=180,
@@ -193,7 +224,10 @@ def main():
         
         # Optionally quantize
         if args.quantize:
-            quantized_path = args.output.replace('.mlmodel', '_quantized.mlmodel')
+            if args.output.endswith('.mlpackage'):
+                quantized_path = args.output.replace('.mlpackage', '_quantized.mlpackage')
+            else:
+                quantized_path = args.output.replace('.mlmodel', '_quantized.mlpackage')
             quantize_model(args.output, quantized_path)
         
         print(f"\n✅ Conversion complete!")

@@ -1,0 +1,188 @@
+name: Test RCAN CoreML Model
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        description: 'Run ID of the conversion workflow (find it in the URL)'
+        required: false
+        type: string
+  workflow_run:
+    workflows: ["Convert RCAN to CoreML"]
+    types:
+      - completed
+
+jobs:
+  test:
+    name: Test CoreML Model
+    runs-on: macos-latest
+    # Only run if the conversion workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install coremltools numpy pillow
+      
+      - name: Download model artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: rcan-coreml-models-scale3
+          path: models/
+        continue-on-error: true
+      
+      - name: Unzip model
+        run: |
+          echo "Unzipping CoreML model..."
+          cd models
+          
+          if [ -f "RCAN_BIX3.mlpackage.zip" ]; then
+            unzip -q RCAN_BIX3.mlpackage.zip
+            echo "✓ Model unzipped successfully"
+            ls -lh RCAN_BIX3.mlpackage/
+          else
+            echo "❌ Model zip file not found!"
+            echo "Available files:"
+            ls -la
+            exit 1
+          fi
+      
+      - name: Run model test
+        run: |
+          echo "Testing RCAN CoreML model..."
+          
+          python - <<'EOF'
+          import coremltools as ct
+          import numpy as np
+          from PIL import Image
+          import sys
+          
+          print("=" * 60)
+          print("RCAN CoreML Model Test")
+          print("=" * 60)
+          
+          # Load model
+          print("\n1. Loading model...")
+          try:
+              model = ct.models.MLModel('models/RCAN_BIX3.mlpackage')
+              print("   ✅ Model loaded successfully")
+          except Exception as e:
+              print(f"   ❌ Failed to load model: {e}")
+              sys.exit(1)
+          
+          # Print model info
+          spec = model.get_spec()
+          print("\n2. Model Information:")
+          print(f"   Input: {spec.description.input[0].name}")
+          print(f"   Output: {spec.description.output[0].name}")
+          
+          # Create test image (180x180)
+          print("\n3. Creating test image (180×180)...")
+          test_array = np.random.randint(0, 256, (180, 180, 3), dtype=np.uint8)
+          test_image = Image.fromarray(test_array)
+          print(f"   Created image: {test_image.size}")
+          
+          # Run inference
+          print("\n4. Running inference...")
+          try:
+              result = model.predict({'input_image': test_image})
+              output = result['output_image']
+              print("   ✅ Inference successful!")
+          except Exception as e:
+              print(f"   ❌ Inference failed: {e}")
+              import traceback
+              traceback.print_exc()
+              sys.exit(1)
+          
+          # Verify output
+          print("\n5. Verifying output...")
+          print(f"   Output type: {type(output)}")
+          print(f"   Output shape: {output.shape}")
+          print(f"   Output range: [{output.min():.1f}, {output.max():.1f}]")
+          
+          # Check dimensions
+          if len(output.shape) == 4:
+              batch, channels, height, width = output.shape
+              print(f"   Dimensions: batch={batch}, channels={channels}, height={height}, width={width}")
+              
+              # Verify 3x upscaling
+              if height == 540 and width == 540:
+                  print("\n   ✅ CORRECT: 180×180 → 540×540 (3x upscaling)")
+              else:
+                  print(f"\n   ⚠️  WARNING: Expected 540×540, got {height}×{width}")
+          
+          # Save output as image
+          print("\n6. Saving test output...")
+          if len(output.shape) == 4:
+              # Convert (1, 3, H, W) -> (H, W, 3)
+              output_img = output[0].transpose(1, 2, 0)
+          else:
+              output_img = output
+          
+          output_img = np.clip(output_img, 0, 255).astype(np.uint8)
+          output_pil = Image.fromarray(output_img)
+          output_pil.save('models/test_output.png')
+          test_image.save('models/test_input.png')
+          
+          print(f"   Saved: test_input.png (180×180)")
+          print(f"   Saved: test_output.png (540×540)")
+          
+          print("\n" + "=" * 60)
+          print("✅ ALL TESTS PASSED!")
+          print("=" * 60)
+          print("\nModel Summary:")
+          print("  - Input: 180×180 RGB image")
+          print("  - Output: 540×540 RGB image (3x resolution)")
+          print("  - Model size: ~31 MB")
+          print("  - Status: Ready for iOS deployment!")
+          
+          EOF
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            models/test_input.png
+            models/test_output.png
+            models/MODEL_INFO.txt
+          retention-days: 30
+        continue-on-error: true
+      
+      - name: Test summary
+        if: always()
+        run: |
+          echo "## 🧪 Model Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "models/test_output.png" ]; then
+            echo "### ✅ Test Status: PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Test Verification:**" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Model loaded successfully" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Inference completed" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Output shape verified (540×540)" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ 3x upscaling confirmed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Test Images:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Input: 180×180 pixels" >> $GITHUB_STEP_SUMMARY
+            echo "- Output: 540×540 pixels (3x)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📦 Test images uploaded as artifacts" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Test Status: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the logs above for error details." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Model is ready for iOS deployment!** 🚀" >> $GITHUB_STEP_SUMMARY

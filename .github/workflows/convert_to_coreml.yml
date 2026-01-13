@@ -161,6 +161,8 @@ jobs:
             zip -r RCAN_BIX${SCALE}_quantized.mlpackage.zip RCAN_BIX${SCALE}_quantized.mlpackage
             cd ..
             echo "✓ Zipped RCAN_BIX${SCALE}_quantized.mlpackage"
+          else
+            echo "⚠️  Quantized model not found (may have been skipped)"
           fi
           
           ls -lh models/*.zip
@@ -227,13 +229,16 @@ jobs:
           echo "- **Scale:** ${SCALE}x" >> $GITHUB_STEP_SUMMARY
           echo "- **Format:** ML Program (.mlpackage)" >> $GITHUB_STEP_SUMMARY
           echo "- **Input Size:** ${{ github.event.inputs.input_size || '180' }}x${{ github.event.inputs.input_size || '180' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Quantized:** ${{ github.event.inputs.quantize || 'true' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Precision:** Float32 (full precision)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Generated Files (Zipped)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          ls -lh models/*.zip >> $GITHUB_STEP_SUMMARY
+          ls -lh models/*.zip 2>/dev/null || echo "No zip files found" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ CoreML models are available as artifacts (download and unzip)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Note:** .mlpackage files are zipped for download. Unzip them to use in Xcode." >> $GITHUB_STEP_SUMMARY
+          echo "### Notes" >> $GITHUB_STEP_SUMMARY
+          echo "- .mlpackage files are zipped for download. Unzip them to use in Xcode." >> $GITHUB_STEP_SUMMARY
+          echo "- Post-conversion quantization is currently not supported for ML Program models." >> $GITHUB_STEP_SUMMARY
+          echo "- Full precision models work great on Apple Neural Engine!" >> $GITHUB_STEP_SUMMARY
